@@ -27,7 +27,7 @@
   #acct{margin-top:12px;font-size:12px;color:#9fc0cb}
   .linkbtn{background:none;border:none;color:#5fe0d0;cursor:pointer;font:inherit;text-decoration:underline;padding:4px}
   #signinForm{margin-top:8px;flex-direction:column;gap:6px}
-  #emailIn{background:#04161c;border:1px solid #1c4350;border-radius:8px;color:#e8f4f4;font:13px 'Space Mono',monospace;padding:8px 10px;text-align:center}
+  #emailIn,#refIn{background:#04161c;border:1px solid #1c4350;border-radius:8px;color:#e8f4f4;font:13px 'Space Mono',monospace;padding:8px 10px;text-align:center}
   #sendLink{background:#143b44;border:1px solid #2bd6c0;border-radius:8px;color:#9fffe6;font:700 12px 'Space Mono',monospace;padding:8px;cursor:pointer}
   #acctMsg{font-size:11px;color:#7fb3ad;min-height:14px}
   #roundover{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 12px;background:radial-gradient(circle at 50% 38%,#06222b,#000 85%)}
@@ -58,11 +58,12 @@
       <button id="signinToggle" class="linkbtn">&#128190; Sign in to save your stats</button>
       <div id="signinForm" style="display:none">
         <input id="emailIn" type="email" placeholder="you@email.com" autocomplete="email">
+        <input id="refIn" type="text" placeholder="friend's code (optional)" autocomplete="off" maxlength="12" style="text-transform:uppercase">
         <button id="sendLink">Send me a sign-in link</button>
         <div id="acctMsg"></div>
       </div>
     </div>
-    <div id="acctIn" style="display:none"><span id="welcome"></span> &middot; <span id="credBal"></span> &middot; <button id="signout" class="linkbtn">sign out</button></div>
+    <div id="acctIn" style="display:none"><span id="welcome"></span> &middot; <span id="credBal"></span> &middot; <button id="signout" class="linkbtn">sign out</button><div id="refcode" style="margin-top:6px;font-size:11px;color:#7fb3ad"></div></div>
   </div>
   <div id="adslot">
     <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-9804691594654444" data-ad-slot="8252166745" data-ad-format="auto" data-full-width-responsive="true"></ins>
@@ -141,7 +142,9 @@ async function connect(a){
     room.onMessage("roundEnd",(m)=>{ const list=(m&&m.results)||[]; const mine=list.find(r=>r.id===meId); const d=document.getElementById("roDetail");
       if(mine){ d.innerHTML='<span class="big">'+(mine.survived?(Number(mine.banked).toFixed(2)+" tokens banked"):"Eaten — 0 banked")+'</span>'+
         'Placement: #'+mine.placement+' of '+mine.total+'<br>Chomps this round: '+mine.chomps+
-        (authUser?'':'<br><span style="color:#7fb3ad;font-size:12px">Sign in on the menu to start earning Founder Credits</span>'); }
+        (authUser&&mine.earned?'<br><span style="color:#7fffe6;font-weight:700">+'+mine.earned+' Founder Credits!</span>':'')+
+        (authUser?'':'<br><span style="color:#7fb3ad;font-size:12px">Sign in on the menu to start earning Founder Credits</span>');
+        if(authUser&&mine.creditTotal!=null){var cb=document.getElementById("credBal"); if(cb)cb.textContent=mine.creditTotal+" credits";} }
       else { d.innerHTML='<span class="big">Round complete</span>'; }
       document.getElementById("roundover").classList.add("show"); myVal=0; });
     room.onStateChange((state)=>{const now=performance.now(); if(state.world)WORLD=state.world;state.players.forEach((p,id)=>{let s=rs[id]||(rs[id]={buf:[]});
@@ -161,20 +164,20 @@ const SB_URL="https://fncsykfkobaduudqptei.supabase.co", SB_KEY="sb_publishable_
 let sb=null, authUser=null, authToken=null;
 function renderAcct(){ var o=document.getElementById("acctOut"),i=document.getElementById("acctIn"); if(o)o.style.display=authUser?"none":"block"; if(i)i.style.display=authUser?"block":"none"; }
 async function applySession(session){ authUser=session?session.user:null; authToken=session?session.access_token:null; renderAcct();
-  if(authUser&&sb){ try{ const r=await sb.from("profiles").select("handle,founder_credits").eq("id",authUser.id).single(); const data=r.data;
-    if(data){ var w=document.getElementById("welcome"),cb=document.getElementById("credBal"); if(w)w.textContent="Welcome, "+(data.handle||"Shrimp"); if(cb)cb.textContent=(data.founder_credits||0)+" credits"; } }catch(e){} } }
+  if(authUser&&sb){ try{ const r=await sb.from("profiles").select("handle,founder_credits,referral_code").eq("id",authUser.id).single(); const data=r.data;
+    if(data){ var w=document.getElementById("welcome"),cb=document.getElementById("credBal"); if(w)w.textContent="Welcome, "+(data.handle||"Shrimp"); if(cb)cb.textContent=(data.founder_credits||0)+" credits"; var rc=document.getElementById("refcode"); if(rc&&data.referral_code)rc.innerHTML='Your code: <b style="color:#7fffe6">'+data.referral_code+'</b> &mdash; share for +50 credits'; } }catch(e){} } }
 function initSupa(){ if(sb||!window.supabase)return; sb=window.supabase.createClient(SB_URL,SB_KEY);
   sb.auth.onAuthStateChange(function(_e,session){applySession(session);}); sb.auth.getSession().then(function(r){applySession(r.data.session);}); }
 (function(){ var t=document.getElementById("signinToggle"); if(t)t.onclick=function(){ var fm=document.getElementById("signinForm"); fm.style.display=(fm.style.display==="flex")?"none":"flex"; };
-  var sl=document.getElementById("sendLink"); if(sl)sl.onclick=async function(){ initSupa();
-document.getElementById('again').onclick=function(){ document.getElementById('roundover').classList.remove('show'); };
-document.getElementById('tomenu').onclick=function(){ location.reload(); }; if(!sb){document.getElementById("acctMsg").textContent="loading… try again";return;}
+  var sl=document.getElementById("sendLink"); if(sl)sl.onclick=async function(){ initSupa(); if(!sb){document.getElementById("acctMsg").textContent="loading… try again";return;}
     var email=((document.getElementById("emailIn").value)||"").trim(); var msg=document.getElementById("acctMsg"); if(!email){msg.textContent="enter your email first";return;}
-    var nm=((document.getElementById("nameIn").value)||"").trim()||"Shrimp"; msg.textContent="sending…";
-    var rr=await sb.auth.signInWithOtp({email:email, options:{emailRedirectTo:location.origin+location.pathname, data:{handle:nm.slice(0,14)}}});
+    var nm=((document.getElementById("nameIn").value)||"").trim()||"Shrimp"; var refEl=document.getElementById("refIn"); var refc=refEl?((refEl.value)||"").trim().toUpperCase():""; msg.textContent="sending…";
+    var rr=await sb.auth.signInWithOtp({email:email, options:{emailRedirectTo:location.origin+location.pathname, data:{handle:nm.slice(0,14), ref_code:refc}}});
     msg.textContent=rr.error?("error: "+rr.error.message):"Check your email for a sign-in link!"; };
   var so=document.getElementById("signout"); if(so)so.onclick=async function(){ if(sb)await sb.auth.signOut(); }; })();
 initSupa();
+var _ag=document.getElementById("again"); if(_ag)_ag.onclick=function(){ document.getElementById("roundover").classList.remove("show"); };
+var _tm=document.getElementById("tomenu"); if(_tm)_tm.onclick=function(){ location.reload(); };
 addEventListener("pointermove",e=>{ if(e.pointerType==="touch")return; mouse.x=e.clientX;mouse.y=e.clientY;initAudio();});
 // ---- mobile drag joystick (agar.io style): touch anywhere to steer ----
 let joy={active:false,ox:0,oy:0,kx:0,ky:0};

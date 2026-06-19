@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Daddy Shrimp — Live Arena</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9804691594654444" crossorigin="anonymous"></script>
@@ -8,12 +8,12 @@
   html,body{height:100%;overflow:hidden;background:#000}
   body{font-family:'Space Mono',ui-monospace,monospace;color:#e8f4f4;touch-action:none}
   canvas{display:block;width:100%;height:100%}
-  #hud{position:fixed;top:12px;left:0;right:0;display:flex;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:700;letter-spacing:1px}
+  #hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:0;right:0;display:flex;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:700;letter-spacing:1px}
   .pill{background:rgba(7,20,27,.72);border:1px solid #1c4350;border-radius:999px;padding:6px 14px;box-shadow:0 0 14px #38f0d433;pointer-events:none}
   #mute{pointer-events:auto;cursor:pointer}
   #conn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80%;text-align:center;background:rgba(7,20,27,.9);border:1px solid #1c4350;border-radius:12px;padding:16px 22px;font-size:14px;line-height:1.5;white-space:pre-line}
-  #start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,#06222b,#000 80%)}
-  #start .card{background:rgba(7,20,27,.94);border:1px solid #1c4350;border-radius:18px;padding:20px 22px;width:min(92vw,340px);text-align:center;box-shadow:0 0 40px #38f0d433}
+  #start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 18px) 12px calc(env(safe-area-inset-bottom,0px) + 18px);background:radial-gradient(circle at 50% 38%,#06222b,#000 80%)}
+  #start .card{margin:auto;background:rgba(7,20,27,.94);border:1px solid #1c4350;border-radius:18px;padding:20px 22px;width:min(92vw,340px);text-align:center;box-shadow:0 0 40px #38f0d433}
   #start .logo{font-size:25px;font-weight:700;letter-spacing:3px;color:#5fe0d0;text-shadow:0 0 16px #38f0d4aa;margin-bottom:4px}
   #prev{display:block;margin:6px auto 8px;background:rgba(0,0,0,.35);border-radius:12px}
   #start .lbl{display:block;text-align:left;font-size:11px;letter-spacing:2px;color:#7fb3ad;margin:10px 0 6px}
@@ -35,7 +35,7 @@
 <div id="hud"><div style="display:flex;gap:8px;align-items:center"><div class="pill" id="score" style="color:#39e3cf">0.00 tokens</div><div class="pill" id="chomps" style="color:#ffd27f">0 chomps</div></div>
   <div style="display:flex;gap:8px"><div class="pill" id="time">3:00</div><div class="pill" id="mute">&#128266;</div><div class="pill" id="music" style="pointer-events:auto;cursor:pointer">&#9835; off</div><div class="pill" id="pop" style="color:#9fc0cb">…</div></div></div>
 <div id="conn">loading…</div>
-<div id="board" style="position:fixed;top:56px;right:10px;font:12px 'Space Mono',monospace;color:#cfeee8;background:rgba(7,20,27,.62);border:1px solid rgba(90,220,200,.25);border-radius:10px;padding:8px 10px;min-width:158px;pointer-events:none;z-index:5"></div>
+<div id="board" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 54px);right:10px;font:12px 'Space Mono',monospace;color:#cfeee8;background:rgba(7,20,27,.62);border:1px solid rgba(90,220,200,.25);border-radius:10px;padding:8px 10px;min-width:158px;pointer-events:none;z-index:5"></div>
 <div id="start"><div class="card">
   <div class="logo">DADDY SHRIMP</div>
   <canvas id="prev" width="180" height="150"></canvas>
@@ -152,7 +152,14 @@ function initSupa(){ if(sb||!window.supabase)return; sb=window.supabase.createCl
     msg.textContent=rr.error?("error: "+rr.error.message):"Check your email for a sign-in link!"; };
   var so=document.getElementById("signout"); if(so)so.onclick=async function(){ if(sb)await sb.auth.signOut(); }; })();
 initSupa();
-addEventListener("pointermove",e=>{mouse.x=e.clientX;mouse.y=e.clientY;initAudio();});
+addEventListener("pointermove",e=>{ if(e.pointerType==="touch")return; mouse.x=e.clientX;mouse.y=e.clientY;initAudio();});
+// ---- mobile drag joystick (agar.io style): touch anywhere to steer ----
+let joy={active:false,ox:0,oy:0,kx:0,ky:0};
+function joySteer(){ let dx=joy.kx-joy.ox,dy=joy.ky-joy.oy,d=Math.hypot(dx,dy); if(d<8){mouse.x=W/2;mouse.y=H/2;} else {mouse.x=W/2+dx/d*400;mouse.y=H/2+dy/d*400;} }
+c.addEventListener("touchstart",e=>{ initAudio(); const t=e.changedTouches[0]; joy.active=true; joy.ox=t.clientX; joy.oy=t.clientY; joy.kx=t.clientX; joy.ky=t.clientY; joySteer(); e.preventDefault(); },{passive:false});
+c.addEventListener("touchmove",e=>{ if(!joy.active)return; const t=e.changedTouches[0]; joy.kx=t.clientX; joy.ky=t.clientY; joySteer(); e.preventDefault(); },{passive:false});
+c.addEventListener("touchend",e=>{ joy.active=false; mouse.x=W/2; mouse.y=H/2; e.preventDefault(); },{passive:false});
+c.addEventListener("touchcancel",e=>{ joy.active=false; mouse.x=W/2; mouse.y=H/2; },{passive:false});
 addEventListener("keydown",initAudio);
 function interp(s,rt){const b=s.buf;if(!b||!b.length)return null;if(b.length===1)return{x:b[0].x,y:b[0].y};
   for(let i=b.length-1;i>0;i--){if(b[i-1].t<=rt){const a=b[i-1],cc=b[i],f=Math.max(0,Math.min(1,(rt-a.t)/((cc.t-a.t)||1)));return{x:a.x+(cc.x-a.x)*f,y:a.y+(cc.y-a.y)*f};}}return{x:b[0].x,y:b[0].y};}
@@ -223,6 +230,9 @@ function loop(ts){
     if(me)document.getElementById("score").textContent=me.value.toFixed(2)+" tokens";
     const tt=room.state.timeLeft|0;document.getElementById("time").textContent=(tt/60|0)+":"+String(tt%60).padStart(2,"0");
     let n=0;room.state.players.forEach(()=>n++);document.getElementById("pop").textContent="◍ "+n+" in arena";
+    if(joy.active){ let dx=joy.kx-joy.ox,dy=joy.ky-joy.oy,d=Math.hypot(dx,dy)||1,r=58,cl=Math.min(d,r),kx=joy.ox+dx/d*cl,ky=joy.oy+dy/d*cl;
+      ctx.globalAlpha=0.45;ctx.strokeStyle="#5fe0d0";ctx.lineWidth=2;ctx.beginPath();ctx.arc(joy.ox,joy.oy,r,0,6.2832);ctx.stroke();
+      ctx.fillStyle="#39e3cf";ctx.beginPath();ctx.arc(kx,ky,22,0,6.2832);ctx.fill();ctx.globalAlpha=1; }
     if(flash>0){ctx.fillStyle="rgba(255,92,92,"+(flash*0.4)+")";ctx.fillRect(0,0,W,H);flash*=0.92;}
   }
   requestAnimationFrame(loop);

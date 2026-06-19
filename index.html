@@ -30,6 +30,13 @@
   #emailIn,#refIn{background:#04161c;border:1px solid #1c4350;border-radius:8px;color:#e8f4f4;font:13px 'Space Mono',monospace;padding:8px 10px;text-align:center}
   #sendLink{background:#143b44;border:1px solid #2bd6c0;border-radius:8px;color:#9fffe6;font:700 12px 'Space Mono',monospace;padding:8px;cursor:pointer}
   #acctMsg{font-size:11px;color:#7fb3ad;min-height:14px}
+  #stats{margin-top:16px;display:none}
+  #stats.show{display:block}
+  #stats h4{font-size:11px;letter-spacing:2px;color:#7fb3ad;text-align:left;margin:0 0 8px}
+  .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:rgba(4,22,28,.6);border:1px solid #143b44;border-radius:10px;padding:9px 4px;text-align:center}
+  .stat b{display:block;font-size:18px;color:#7fffe6;text-shadow:0 0 8px #38f0d488;line-height:1.2}
+  .stat span{font-size:8.5px;letter-spacing:1px;color:#7fb3ad}
   #roundover{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 12px;background:radial-gradient(circle at 50% 38%,#06222b,#000 85%)}
   #roundover.show{display:flex}
   #roundover .card{margin:auto;background:rgba(7,20,27,.96);border:1px solid #1c4350;border-radius:18px;padding:24px;width:min(92vw,340px);text-align:center;box-shadow:0 0 40px #38f0d433}
@@ -65,6 +72,14 @@
     </div>
     <div id="acctIn" style="display:none"><span id="welcome"></span> &middot; <span id="credBal"></span> &middot; <button id="signout" class="linkbtn">sign out</button><div id="refcode" style="margin-top:6px;font-size:11px;color:#7fb3ad"></div></div>
   </div>
+  <div id="stats"><h4>YOUR STATS</h4><div class="statgrid">
+    <div class="stat"><b id="st_cred">0</b><span>CREDITS</span></div>
+    <div class="stat"><b id="st_rounds">0</b><span>ROUNDS</span></div>
+    <div class="stat"><b id="st_chomps">0</b><span>CHOMPS</span></div>
+    <div class="stat"><b id="st_tokens">0</b><span>TOTAL TOKENS</span></div>
+    <div class="stat"><b id="st_best">0</b><span>BEST ROUND</span></div>
+    <div class="stat"><b id="st_size">0</b><span>BIGGEST</span></div>
+  </div></div>
   <div id="adslot">
     <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-9804691594654444" data-ad-slot="8252166745" data-ad-format="auto" data-full-width-responsive="true"></ins>
     <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
@@ -135,7 +150,8 @@ async function connect(a){
   if(typeof Colyseus==="undefined"){show("Game library didn't load — check internet and reopen.");return;}
   try{show(a>1?("waking the server… attempt "+a+" (free servers take ~30–60s)"):"connecting to the arena…");
     const client=new Colyseus.Client(WS_URL);const name=(localStorage.getItem("ds_name")||("Shrimp"+((Math.random()*900+100)|0)));
-    room=await client.joinOrCreate("arena",{mode:"live",name,color:(localStorage.getItem("ds_color")||""),token:(authToken||"")});meId=room.sessionId;hide();
+    let tok=authToken||""; try{ if(sb){ const ss=await sb.auth.getSession(); if(ss&&ss.data&&ss.data.session) tok=ss.data.session.access_token; } }catch(e){}
+    room=await client.joinOrCreate("arena",{mode:"live",name,color:(localStorage.getItem("ds_color")||""),token:tok});meId=room.sessionId;hide();
     room.onMessage("eaten",()=>{flash=1;sndEaten();});
     room.onMessage("sting",(m)=>{flash=Math.max(flash,0.5);popups.push({x:lastCamX,y:lastCamY-40,v:-(m&&m.amount||0),col:"#ff6b6b",life:1});sndSting();});
     room.onMessage("bump",()=>{sndThud();});
@@ -146,7 +162,7 @@ async function connect(a){
         (authUser?'':'<br><span style="color:#7fb3ad;font-size:12px">Sign in on the menu to start earning Founder Credits</span>');
         if(authUser&&mine.creditTotal!=null){var cb=document.getElementById("credBal"); if(cb)cb.textContent=mine.creditTotal+" credits";} }
       else { d.innerHTML='<span class="big">Round complete</span>'; }
-      document.getElementById("roundover").classList.add("show"); myVal=0; });
+      document.getElementById("roundover").classList.add("show"); myVal=0; if(authUser&&sb){ sb.auth.getSession().then(function(r){applySession(r.data.session);}); } });
     room.onStateChange((state)=>{const now=performance.now(); if(state.world)WORLD=state.world;state.players.forEach((p,id)=>{let s=rs[id]||(rs[id]={buf:[]});
       s.buf.push({t:now,x:p.x,y:p.y});if(s.buf.length>10)s.buf.shift();s.color=p.color;s.name=p.name;s.value=p.value;s.alive=p.alive;s.isBot=p.isBot;s.hidden=p.hidden;});});
   }catch(e){const m=(e&&(e.message||e.code))||String(e);if(a<5){show("waking the server… ("+m+")");setTimeout(()=>connect(a+1),4000);}else{show("Couldn't connect: "+m+"\n\n"+WS_URL);console.error(e);}}
@@ -164,8 +180,15 @@ const SB_URL="https://fncsykfkobaduudqptei.supabase.co", SB_KEY="sb_publishable_
 let sb=null, authUser=null, authToken=null;
 function renderAcct(){ var o=document.getElementById("acctOut"),i=document.getElementById("acctIn"); if(o)o.style.display=authUser?"none":"block"; if(i)i.style.display=authUser?"block":"none"; }
 async function applySession(session){ authUser=session?session.user:null; authToken=session?session.access_token:null; renderAcct();
-  if(authUser&&sb){ try{ const r=await sb.from("profiles").select("handle,founder_credits,referral_code").eq("id",authUser.id).single(); const data=r.data;
-    if(data){ var w=document.getElementById("welcome"),cb=document.getElementById("credBal"); if(w)w.textContent="Welcome, "+(data.handle||"Shrimp"); if(cb)cb.textContent=(data.founder_credits||0)+" credits"; var rc=document.getElementById("refcode"); if(rc&&data.referral_code)rc.innerHTML='Your code: <b style="color:#7fffe6">'+data.referral_code+'</b> &mdash; share for +50 credits'; } }catch(e){} } }
+  var statsEl=document.getElementById("stats");
+  if(authUser&&sb){ try{ const r=await sb.from("profiles").select("handle,founder_credits,referral_code,rounds_played,total_chomps,lifetime_tokens,best_round,biggest_size").eq("id",authUser.id).single(); const data=r.data;
+    if(data){ var w=document.getElementById("welcome"),cb=document.getElementById("credBal"); if(w)w.textContent="Welcome, "+(data.handle||"Shrimp"); if(cb)cb.textContent=(data.founder_credits||0)+" credits";
+      var rc=document.getElementById("refcode"); if(rc&&data.referral_code)rc.innerHTML='Your code: <b style="color:#7fffe6">'+data.referral_code+'</b> &mdash; share for +50 credits';
+      function setT(id,v){var e=document.getElementById(id); if(e)e.textContent=v;}
+      setT("st_cred",data.founder_credits||0); setT("st_rounds",data.rounds_played||0); setT("st_chomps",data.total_chomps||0);
+      setT("st_tokens",Math.round(data.lifetime_tokens||0)); setT("st_best",Number(data.best_round||0).toFixed(0)); setT("st_size",Number(data.biggest_size||0).toFixed(0));
+      if(statsEl)statsEl.classList.add("show"); } }catch(e){} }
+  else { if(statsEl)statsEl.classList.remove("show"); } }
 function initSupa(){ if(sb||!window.supabase)return; sb=window.supabase.createClient(SB_URL,SB_KEY);
   sb.auth.onAuthStateChange(function(_e,session){applySession(session);}); sb.auth.getSession().then(function(r){applySession(r.data.session);}); }
 (function(){ var t=document.getElementById("signinToggle"); if(t)t.onclick=function(){ var fm=document.getElementById("signinForm"); fm.style.display=(fm.style.display==="flex")?"none":"flex"; };

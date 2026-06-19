@@ -30,6 +30,15 @@
   #emailIn{background:#04161c;border:1px solid #1c4350;border-radius:8px;color:#e8f4f4;font:13px 'Space Mono',monospace;padding:8px 10px;text-align:center}
   #sendLink{background:#143b44;border:1px solid #2bd6c0;border-radius:8px;color:#9fffe6;font:700 12px 'Space Mono',monospace;padding:8px;cursor:pointer}
   #acctMsg{font-size:11px;color:#7fb3ad;min-height:14px}
+  #roundover{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 12px;background:radial-gradient(circle at 50% 38%,#06222b,#000 85%)}
+  #roundover.show{display:flex}
+  #roundover .card{margin:auto;background:rgba(7,20,27,.96);border:1px solid #1c4350;border-radius:18px;padding:24px;width:min(92vw,340px);text-align:center;box-shadow:0 0 40px #38f0d433}
+  #roundover .logo{font-size:24px;font-weight:700;letter-spacing:3px;color:#5fe0d0;text-shadow:0 0 16px #38f0d4aa}
+  #roDetail{margin:16px 0;font-size:15px;line-height:1.9;color:#cfeee8}
+  #roDetail .big{font-size:28px;font-weight:700;color:#7fffe6;text-shadow:0 0 14px #38f0d4aa;display:block;margin-bottom:6px}
+  #again{margin-top:4px;width:100%;background:linear-gradient(90deg,#2bd6c0,#39a0e3);border:none;border-radius:12px;color:#04161c;font:700 17px 'Space Mono',monospace;letter-spacing:2px;padding:13px;cursor:pointer}
+  #again:active{transform:scale(.98)}
+  #tomenu{margin-top:12px;display:inline-block}
 </style></head><body>
 <canvas id="c"></canvas>
 <div id="hud"><div style="display:flex;gap:8px;align-items:center"><div class="pill" id="score" style="color:#39e3cf">0.00 tokens</div><div class="pill" id="chomps" style="color:#ffd27f">0 chomps</div></div>
@@ -59,6 +68,12 @@
     <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-9804691594654444" data-ad-slot="8252166745" data-ad-format="auto" data-full-width-responsive="true"></ins>
     <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
   </div>
+</div></div>
+<div id="roundover"><div class="card">
+  <div class="logo">ROUND OVER</div>
+  <div id="roDetail"></div>
+  <button id="again">PLAY AGAIN &#9656;</button>
+  <button id="tomenu" class="linkbtn">back to menu</button>
 </div></div>
 <script src="rig-data.js"></script>
 <script src="env-data.js"></script>
@@ -123,6 +138,12 @@ async function connect(a){
     room.onMessage("eaten",()=>{flash=1;sndEaten();});
     room.onMessage("sting",(m)=>{flash=Math.max(flash,0.5);popups.push({x:lastCamX,y:lastCamY-40,v:-(m&&m.amount||0),col:"#ff6b6b",life:1});sndSting();});
     room.onMessage("bump",()=>{sndThud();});
+    room.onMessage("roundEnd",(m)=>{ const list=(m&&m.results)||[]; const mine=list.find(r=>r.id===meId); const d=document.getElementById("roDetail");
+      if(mine){ d.innerHTML='<span class="big">'+(mine.survived?(Number(mine.banked).toFixed(2)+" tokens banked"):"Eaten — 0 banked")+'</span>'+
+        'Placement: #'+mine.placement+' of '+mine.total+'<br>Chomps this round: '+mine.chomps+
+        (authUser?'':'<br><span style="color:#7fb3ad;font-size:12px">Sign in on the menu to start earning Founder Credits</span>'); }
+      else { d.innerHTML='<span class="big">Round complete</span>'; }
+      document.getElementById("roundover").classList.add("show"); myVal=0; });
     room.onStateChange((state)=>{const now=performance.now(); if(state.world)WORLD=state.world;state.players.forEach((p,id)=>{let s=rs[id]||(rs[id]={buf:[]});
       s.buf.push({t:now,x:p.x,y:p.y});if(s.buf.length>10)s.buf.shift();s.color=p.color;s.name=p.name;s.value=p.value;s.alive=p.alive;s.isBot=p.isBot;s.hidden=p.hidden;});});
   }catch(e){const m=(e&&(e.message||e.code))||String(e);if(a<5){show("waking the server… ("+m+")");setTimeout(()=>connect(a+1),4000);}else{show("Couldn't connect: "+m+"\n\n"+WS_URL);console.error(e);}}
@@ -145,7 +166,9 @@ async function applySession(session){ authUser=session?session.user:null; authTo
 function initSupa(){ if(sb||!window.supabase)return; sb=window.supabase.createClient(SB_URL,SB_KEY);
   sb.auth.onAuthStateChange(function(_e,session){applySession(session);}); sb.auth.getSession().then(function(r){applySession(r.data.session);}); }
 (function(){ var t=document.getElementById("signinToggle"); if(t)t.onclick=function(){ var fm=document.getElementById("signinForm"); fm.style.display=(fm.style.display==="flex")?"none":"flex"; };
-  var sl=document.getElementById("sendLink"); if(sl)sl.onclick=async function(){ initSupa(); if(!sb){document.getElementById("acctMsg").textContent="loading… try again";return;}
+  var sl=document.getElementById("sendLink"); if(sl)sl.onclick=async function(){ initSupa();
+document.getElementById('again').onclick=function(){ document.getElementById('roundover').classList.remove('show'); };
+document.getElementById('tomenu').onclick=function(){ location.reload(); }; if(!sb){document.getElementById("acctMsg").textContent="loading… try again";return;}
     var email=((document.getElementById("emailIn").value)||"").trim(); var msg=document.getElementById("acctMsg"); if(!email){msg.textContent="enter your email first";return;}
     var nm=((document.getElementById("nameIn").value)||"").trim()||"Shrimp"; msg.textContent="sending…";
     var rr=await sb.auth.signInWithOtp({email:email, options:{emailRedirectTo:location.origin+location.pathname, data:{handle:nm.slice(0,14)}}});

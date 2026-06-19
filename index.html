@@ -50,6 +50,14 @@
   .stat{background:rgba(4,22,28,.6);border:1px solid #143b44;border-radius:10px;padding:9px 4px;text-align:center}
   .stat b{display:block;font-size:18px;color:#7fffe6;text-shadow:0 0 8px #38f0d488;line-height:1.2}
   .stat span{font-size:8.5px;letter-spacing:1px;color:#7fb3ad}
+  #lbbtn{margin-top:12px;width:100%;background:rgba(20,59,68,.55);border:1px solid #2bd6c0;border-radius:12px;color:#9fffe6;font:700 14px 'Space Mono',monospace;letter-spacing:1px;padding:11px;cursor:pointer}
+  #lbpanel{position:fixed;inset:0;z-index:61;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:24px 12px;background:rgba(2,10,14,.86)}
+  #lbpanel.show{display:flex}
+  #lbpanel .card{margin:auto;background:rgba(7,20,27,.97);border:1px solid #1c4350;border-radius:16px;padding:20px;width:min(92vw,340px);text-align:center;box-shadow:0 0 40px #38f0d433}
+  #lbpanel .ttl{font-size:18px;font-weight:700;letter-spacing:1px;color:#5fe0d0;text-shadow:0 0 14px #38f0d455}
+  #lblist{margin:14px 0;font-size:13px;text-align:left}
+  #lbpanel .row{display:flex;justify-content:space-between;gap:8px;padding:6px 4px;border-bottom:1px solid rgba(90,220,200,.12)}
+  #lbpanel .row b{color:#7fffe6}
   #roundover{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 12px;background:radial-gradient(circle at 50% 38%,#06222b,#000 85%)}
   #roundover.show{display:flex}
   #roundover .card{margin:auto;background:rgba(7,20,27,.96);border:1px solid #1c4350;border-radius:18px;padding:24px;width:min(92vw,340px);text-align:center;box-shadow:0 0 40px #38f0d433}
@@ -93,12 +101,14 @@
     <div class="stat"><b id="st_best">0</b><span>BEST ROUND</span></div>
     <div class="stat"><b id="st_size">0</b><span>BIGGEST</span></div>
   </div></div>
+  <button id="lbbtn">&#127942; WEEKLY LEADERBOARD</button>
   <div id="adslot">
     <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-9804691594654444" data-ad-slot="8252166745" data-ad-format="auto" data-full-width-responsive="true"></ins>
     <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
   </div>
   <div id="legal" style="margin-top:14px;font-size:10.5px;color:#5a7a78;line-height:1.6">Early access &middot; Founder Credits have no cash value<br><a href="about.html" style="color:#5fe0d0">How to Play &amp; Roadmap</a> &middot; <a href="privacy.html" style="color:#5fe0d0">Privacy &amp; Terms</a></div>
 </div></div>
+<div id="lbpanel"><div class="card"><div class="ttl">&#127942; WEEKLY LEADERBOARD</div><div id="lblist"></div><button id="lbclose" class="linkbtn">close</button></div></div>
 <div id="roundover"><div class="card">
   <div class="logo">ROUND OVER</div>
   <div id="roDetail"></div>
@@ -172,7 +182,7 @@ async function connect(a){
     room.onMessage("roundEnd",(m)=>{ const list=(m&&m.results)||[]; const mine=list.find(r=>r.id===meId); const d=document.getElementById("roDetail");
       if(mine){ d.innerHTML='<span class="big">'+(mine.survived?(Number(mine.banked).toFixed(2)+" tokens banked"):"Eaten — 0 banked")+'</span>'+
         'Placement: #'+mine.placement+' of '+mine.total+'<br>Chomps this round: '+mine.chomps+
-        (authUser&&mine.earned?'<br><span style="color:#7fffe6;font-weight:700">+'+mine.earned+' Founder Credits!</span>':'')+
+        (authUser&&mine.earned?'<br><span style="color:#7fffe6;font-weight:700">+'+mine.earned+' Founder Credits!</span>':'')+(authUser&&mine.streakBonus?'<br><span style="color:#ffd27f">&#128293; Day '+mine.streak+' streak &middot; +'+mine.streakBonus+'</span>':'')+
         (authUser?'':'<br><span style="color:#7fb3ad;font-size:12px">Sign in on the menu to start earning Founder Credits</span>');
         if(authUser&&mine.creditTotal!=null){var cb=document.getElementById("credBal"); if(cb)cb.textContent=mine.creditTotal+" credits";} }
       else { d.innerHTML='<span class="big">Round complete</span>'; }
@@ -195,8 +205,8 @@ let sb=null, authUser=null, authToken=null;
 function renderAcct(){ var o=document.getElementById("acctOut"),i=document.getElementById("acctIn"); if(o)o.style.display=authUser?"none":"block"; if(i)i.style.display=authUser?"block":"none"; }
 async function applySession(session){ authUser=session?session.user:null; authToken=session?session.access_token:null; renderAcct();
   var statsEl=document.getElementById("stats");
-  if(authUser&&sb){ try{ const r=await sb.from("profiles").select("handle,founder_credits,referral_code,rounds_played,total_chomps,lifetime_tokens,best_round,biggest_size").eq("id",authUser.id).single(); const data=r.data;
-    if(data){ var w=document.getElementById("welcome"),cb=document.getElementById("credBal"); if(w)w.textContent="Welcome, "+(data.handle||"Shrimp"); if(cb)cb.textContent=(data.founder_credits||0)+" credits";
+  if(authUser&&sb){ try{ const r=await sb.from("profiles").select("handle,founder_credits,referral_code,rounds_played,total_chomps,lifetime_tokens,best_round,biggest_size,current_streak").eq("id",authUser.id).single(); const data=r.data;
+    if(data){ var w=document.getElementById("welcome"),cb=document.getElementById("credBal"); if(w)w.textContent="Welcome, "+(data.handle||"Shrimp")+(data.current_streak?"  \uD83D\uDD25"+data.current_streak+"d":""); if(cb)cb.textContent=(data.founder_credits||0)+" credits";
       var rc=document.getElementById("refcode"); if(rc&&data.referral_code)rc.innerHTML='Your code: <b style="color:#7fffe6">'+data.referral_code+'</b> &mdash; share for +50 credits';
       function setT(id,v){var e=document.getElementById(id); if(e)e.textContent=v;}
       setT("st_cred",data.founder_credits||0); setT("st_rounds",data.rounds_played||0); setT("st_chomps",data.total_chomps||0);
@@ -215,6 +225,11 @@ function initSupa(){ if(sb||!window.supabase)return; sb=window.supabase.createCl
 initSupa();
 var _ag=document.getElementById("again"); if(_ag)_ag.onclick=function(){ document.getElementById("roundover").classList.remove("show"); };
 var _tm=document.getElementById("tomenu"); if(_tm)_tm.onclick=function(){ location.reload(); };
+var _lb=document.getElementById("lbbtn"); if(_lb)_lb.onclick=async function(){ initSupa(); var box=document.getElementById("lblist"); box.innerHTML="loading\u2026"; document.getElementById("lbpanel").classList.add("show");
+  try{ var rr=await sb.rpc("weekly_leaderboard"); var rows=(rr&&rr.data)||[]; if(!rows.length){ box.innerHTML='<div style="color:#7fb3ad">No scores yet this week \u2014 be the first!</div>'; return; }
+    box.innerHTML=rows.map(function(e,i){ return '<div class="row"><span>'+(i+1)+'. '+esc(String(e.handle||"shrimp").slice(0,14))+'</span><b>'+Number(e.best).toFixed(2)+'</b></div>'; }).join(''); }
+  catch(e){ box.innerHTML='<div style="color:#ff8f8f">couldn\'t load leaderboard</div>'; } };
+var _lc=document.getElementById("lbclose"); if(_lc)_lc.onclick=function(){ document.getElementById("lbpanel").classList.remove("show"); };
 addEventListener("pointermove",e=>{ if(e.pointerType==="touch")return; mouse.x=e.clientX;mouse.y=e.clientY;initAudio();});
 // ---- mobile drag joystick (agar.io style): touch anywhere to steer ----
 let joy={active:false,ox:0,oy:0,kx:0,ky:0};
